@@ -1,0 +1,83 @@
+services:
+  rabbit:
+    image: "rabbitmq:4-management"
+    hostname: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: rabbitmq-diagnostics check_port_connectivity
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    extends:
+      file: common-config.yml
+      service: network-deploy-service
+
+  configserver:
+    image: "manishkr33/configserver:0.0.1-SNAPSHOT"
+    container_name: configserver-ms
+    ports:
+      - "8071:8071"
+    depends_on:
+      rabbit:
+        condition: service_healthy
+    environment:
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+    healthcheck:
+      test: "curl --fail --silent http://localhost:8071/actuator/health/readiness | grep UP || exit 1"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    extends:
+      file: common-config.yml
+      service: microservices-base-config
+
+  accounts:
+    image: "manishkr33/accounts:0.0.1-SNAPSHOT"
+    container_name: accounts-ms
+    ports:
+      - "8080:8080"
+    depends_on:
+      configserver:
+        condition: service_healthy
+    #environment:
+    #SPRING_APPLICATION_NAME: "accounts" (Need to use if doesn't work without it)
+    extends:
+      file: common-config.yml
+      service: microservices-configserver-config
+
+  loans:
+    image: "manishkr33/loans:0.0.1-SNAPSHOT"
+    container_name: loans-ms
+    ports:
+      - "8090:8090"
+    depends_on:
+      configserver:
+        condition: service_healthy
+    #environment:
+    #SPRING_APPLICATION_NAME: "laons" (Need to use if doesn't work without it)
+    extends:
+      file: common-config.yml
+      service: microservices-configserver-config
+
+  cards:
+    image: "manishkr33/cards:0.0.1-SNAPSHOT"
+    container_name: cards-ms
+    ports:
+      - "9000:9000"
+    depends_on:
+      configserver:
+        condition: service_healthy
+    #environment:
+    #SPRING_APPLICATION_NAME: "cards" (Need to use if doesn't work without it)
+    extends:
+      file: common-config.yml
+      service: microservices-configserver-config
+
+networks:
+  eazybank:
+    driver: "bridge"
